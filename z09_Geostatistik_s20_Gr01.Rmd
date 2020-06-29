@@ -1,0 +1,152 @@
+---
+title: "Aufgabe 09"
+author: "Gruppe 01"
+date: "28 6 2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Laden Sie den Workspace yingtan_20_ueb9.Rdata sowie das Paket car.
+Sie werden feststellen, dass der Workspace Variablen enthält, die denen gleichen, welche Sie in der letzen Sitzung erzeugt haben.
+```{r}
+library(tidyverse)
+library(car)
+load("data/yingtan_20_ueb9.Rdata")
+```
+
+## Aufgabe 20 Korrelation
+Korrelation beschreibt die Richtung und Stärke des Zusammenspiels zweier kontinuierlicher Variablen.
+
+a) Berechnen Sie - soweit möglich - geeignete Korrelationskoeffizienten für die austauschbaren Ca-Ionen (evtl. transformiert) mit sämtlichen Reliefgrößen.
+(1 Punkt)
+```{r}
+# Variablen
+Ca <- ljz$Ca_exch
+elev <- ljz$yingtan_elevation
+tri <- ljz$tri
+tpi <- ljz$tpi
+rough <- ljz$roughness
+slope <- ljz$slope
+aspect <- ljz$aspect
+flowdir <- ljz$flowdir
+convg2 <- ljz$CONVG2
+sagawi <- ljz$SAGAWI
+
+# Korrelationskoeffiezienten
+cor(Ca, elev)
+cor(Ca, tri)
+cor(Ca, tpi)
+cor(Ca, rough)
+cor(Ca, slope)
+cor(Ca, aspect)
+cor(Ca, flowdir)
+cor(Ca, convg2)
+cor(Ca, sagawi)
+```
+Die Variable Ca wurde, obwohl sie nicht normalverteilt ist, nicht transformiert, da durch eine Transformierung keine wesentliche Annäherung an die Normalverteilung erreicht wurde. Die Korrelationskoeffizienten zeigen zu den meisten Reliefparametern keinen signifikanten Zusammenhang der austauschbaren Ca-Ionen zu den Reliefparametern. Zu der Demographie besteht ein leichter negativer Zusammenhang (-0,32) und zu der relativen Bodenfeuchte (SAGAWI) besteht ein leichter positiver Zusammenhang (0,32).
+
+b) Erstellen Sie mit Hilfe der Methode scatterplotMatrix eine Scatterplot-Matrix mit den am besten korrelierenden Kovariablen. Stellen Sie die jeweiligen Histogramme in der Diagonalen dar. (1 Punkt)
+```{r}
+scatterplotMatrix(~Ca_exch + yingtan_elevation + SAGAWI,
+                  data = ljz, 
+                  diagonal = TRUE,)
+```
+
+c) Beurteilen Sie abschließend, welche Reliefparameter als potentielle Kovariablen für eine Modellierung in Frage kommen und welche sich eher nicht eignen. Begründen Sie ihre Einschätzung anhand der bisherigen Ergebnisse dieses Aufgabenblattes. (2 Punkte)
+
+Da sich die Werte der austauschbaren Ca-Ionen kaum bezüglich ihrer räumlichen Distanz (bezogen auf ihre geographische Lage zueeinander) kaum ähneln, eignen sich die Koordinaten nicht für eine potenzielle Modellierung. Es scheint einen leichten Zusammenhang zwischen den austauschbaren Ca-Ionen und dem Höhenmodell sowie der relativen Bodenfeuchte (SAGAWI) zu geben. Deshalb eignen sich diese beiden Parameter als Kovariablen für eine Modellierung.
+
+## Aufgabe 21 Multiple Linear Regression
+
+Mit dem Modell der Linearen Regression lassen sich Zielgrößen durch einen oder mehrere Einflussparameter abbilden:
+
+Yi=β0+ β1 xi+ ...+ βn xn+ ε
+
+Wesentliche Arbeitsschritte bei der multiplen linearen Regression sind die Auswahl geeigneter Kovariablen sowie die Überprüfung der Modellannahmen im Anschluss an die Modellierung.
+
+a) Führen Sie eine Variablenauswahl durch. Nutzen Sie die Rückwärtselimination der step-Funktion und beginnen Sie mit den Einflussgrößen, für die Sie sich in Aufg. 20c) entschieden haben. (1 Punkt)
+```{r}
+model <- lm(Ca ~ elev + sagawi)
+step(object = model,
+     direction = "backward")
+```
+
+b) Wenden Sie die Methode summary auf das lm-Objekt aus Aufgabe a) an und beschreiben Sie in knappen Worten, wofür die dargestellten Statistiken stehen. Was sagen die Werte konkret aus? Notieren Sie das Bestimmtheitsmaß der resultierenden Regression. Aus welchen Kovariablen setzt sich das abschließende Regressionsmodell zusammen und sind diese signifikant? (2 Punkte)
+```{r}
+summary(model)
+```
+
+c) Untersuchen Sie ihren Fit aus a) hinsichtlich
+• fehlender Normalverteilung der Residuen
+• Ausreißern und high-leverage points
+• Heteroskedastizität
+• nicht-linearer Regression.
+Nennen Sie alle Annahmeverletzungen, die Sie finden können. BegründenSie ihre Auswahl. (4 Punkte)
+
+```{r}
+plot(model)
+```
+
+• fehlender Normalverteilung der Residuen
+```{r}
+# Residuen
+res <- resid(model)
+
+# Normalverteilung der Residuen
+shapiro.test(res)
+```
+Der W-Wert ist mit 0,89 zwar dicht an 1, aber der p-Wert ist wesentlich kleiner 0,05. Die Residuen sind nicht normalverteilt.
+
+• Ausreißern und high-leverage points
+```{r}
+# Verteilung der Residuen
+hist(res)
+boxplot(res)
+
+# Ausreißer
+out <- ifelse(res < (mean(res) - 2*sd(res)) | res > (mean(res) + 2*sd(res)), 1, 0)
+#out
+
+# high-leverage points
+leveragePlots(model = model)
+```
+Werte > 20 werden als Ausreißer dargestellt. Die Werte 86 und 99 sind high leverage points.
+
+• Heteroskedastizität
+```{r}
+# Breusch-Pragan Test
+library(AER)
+bptest(model)
+```
+
+• nicht-linearer Regression.
+```{r}
+# nicht-lineare Regression
+summary(model)
+```
+R^2 = 0,14 -> mit dem Modell werden knapp 14% der Werte für austauschbare Ca-Ionen erklärt. Es scheint noch weitere Parameter zu geben, die Einfluss auf die Zielgröße haben.
+
+d) Führen Sie nun eine Vorhersage mit dem generierten Regressionsmodell durch. Nutzen Sie das Objekt „terrain“ des geladenen Workspace als Ziel-Grid. Ermitteln Sie anschließend den RMSE dieser Methode, indem Sie eine LOO-Kreuzvalidierung durchführen. (2 Punkte)
+```{r}
+#variomodel <- variogram(Ca ~ elev + sagawi,
+#                         data = ljz,
+#                           cutoff = 2202,
+#                           width = 150)
+#
+#fvariomodel <- fit.variogram(variomodel,
+#                             vgm(model = "Exp"))
+#library(gstat)
+# Ordinary Kriging
+#interpol_Ca <- krige(Ca ~ elev + sagawi, 
+#                            ljz, terrain, 
+#                            model = fvariomodel)
+#plot(interpol_Ca)
+#Leave-one-out-Cross-Validation
+#LOOCV <- gstat::krige.cv(formula = Ca_exch ~ 1, 
+#                  locations = SPDFljz,
+#                  model = vario_omni_Ca_fit)
+```
+
