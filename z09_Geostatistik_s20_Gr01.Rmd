@@ -160,22 +160,44 @@ Die Funktionen der tatsächliche Werte und die der Residuen unterscheiden sich n
 
 d) Führen Sie nun eine Vorhersage mit dem generierten Regressionsmodell durch. Nutzen Sie das Objekt „terrain“ des geladenen Workspace als Ziel-Grid. Ermitteln Sie anschließend den RMSE dieser Methode, indem Sie eine LOO-Kreuzvalidierung durchführen. (2 Punkte)
 ```{r}
-#variomodel <- variogram(Ca ~ elev + sagawi,
-#                         data = ljz,
-#                           cutoff = 2202,
-#                           width = 150)
-#
-#fvariomodel <- fit.variogram(variomodel,
-#                             vgm(model = "Exp"))
-#library(gstat)
+library(gstat)
+variomodel <- variogram(Ca ~ elev + sagawi,
+                        data = ljz,
+                        cutoff = 2202,
+                        width = 150)
+
+m <- vgm(model = "Exp",
+         cutoff = 2202)
+
+fvariomodel <- fit.variogram(variomodel,
+                             model = m,
+                             fit.method = 7)
+
 # Ordinary Kriging
-#interpol_Ca <- krige(Ca ~ elev + sagawi, 
-#                            ljz, terrain, 
-#                            model = fvariomodel)
-#plot(interpol_Ca)
+interpol_Ca <- krige(Ca_exch ~ yingtan_elevation + SAGAWI,
+                     ljz, 
+                     terrain,
+                     model = fvariomodel)
+
+spplot(interpol_Ca)
+
+# Koordinatensystem anpassen
+proj4string(terrain) <- CRS("+proj=utm +zone=50 +ellps=WGS84 +datum=WGS84")
+proj4string(ljz) <- proj4string(terrain)
+
 #Leave-one-out-Cross-Validation
-#LOOCV <- gstat::krige.cv(formula = Ca_exch ~ 1, 
-#                  locations = SPDFljz,
-#                  model = vario_omni_Ca_fit)
+LOOCV <- gstat::krige.cv(Ca_exch ~ yingtan_elevation + SAGAWI,
+                  ljz,
+                  model = fvariomodel)
+
+bubble(LOOCV, "residual")
+
+# RMSE
+rmse <- function(x,y) {
+  sqrt(mean((x-y)^2))
+}
+
+rmse(x = LOOCV$var1.pred,
+     y = LOOCV$observed)
 ```
 
